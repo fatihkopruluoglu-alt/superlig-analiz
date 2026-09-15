@@ -208,7 +208,7 @@ else:
     
     if st.button("🚀 5 YILLIK ARŞİV İLE BENZER MAÇLARI VE SKORLARI GETİR"):
         with st.spinner("🔍 Geçmiş sezonlar taranıyor, genişletilmiş oran toleransı (±0.65) eşleştiriliyor..."):
-            tolerance = 0.65  # Havuzu genişletmek için toleransı biraz esnettik
+            tolerance = 0.65
             toplam_eslesme = 0
             istatistikler = {"MS 1": 0, "MS 0": 0, "MS 2": 0, "2.5 ÜST": 0, "2.5 ALT": 0, "KG VAR": 0, "KG YOK": 0}
             eslesen_maclar_listesi = []
@@ -237,8 +237,6 @@ else:
                                 for b in bms:
                                     if b.get('bookmaker') in ['Pinnacle', 'Bet365']:
                                         m_odds = b.get('markets', {}).get('match_odds', {})
-                                        totals_m = b.get('markets', {}).get('total_goals', {}).get('2.5', {})
-                                        btts_m = b.get('markets', {}).get('btts', {})
                                         if m_odds:
                                             gh = m_odds.get('home', {}).get('opening')
                                             gd = m_odds.get('draw', {}).get('opening')
@@ -251,11 +249,10 @@ else:
                                             sezon_adi = sez.get('name', 'Bilinmiyor')
                                             
                                             if hs is not None and as_ is not None:
-                                                # Tüm arşiv listesi için veriyi hazırlayalım
                                                 toplam_gol = hs + as_
                                                 ust_alt = "2.5 ÜST" if toplam_gol > 2.5 else "2.5 ALT"
                                                 kg_durum = "KG VAR" if (hs > 0 and as_ > 0) else "KG YOK"
-                                                 mac_sonucu = "MS 1" if hs > as_ else ("MS 0" if hs == as_ else "MS 2")
+                                                mac_sonucu = "MS 1" if hs > as_ else ("MS 0" if hs == as_ else "MS 2")
                                                 
                                                 tum_arsiv_listesi.append({
                                                     "Sezon": sezon_adi,
@@ -270,7 +267,6 @@ else:
                                                     "Karşılıklı Gol": kg_durum
                                                 })
 
-                                                # Seçilen maçla benzer oran arayan simülasyon kısmı
                                                 if gh and gd and ga:
                                                     gh_f, gd_f, ga_f = float(gh), float(gd), float(ga)
                                                     if abs(gh_f - target['home']) <= tolerance and abs(gd_f - target['draw']) <= tolerance:
@@ -310,7 +306,7 @@ else:
                 st.subheader("Maç Sonucu")
                 ms1_p = istatistikler["MS 1"] / toplam_eslesme
                 ms0_p = istatistikler["MS 0"] / toplam_eslesme
-                ms2_p = istatistler["MS 2"] / toplam_eslesme
+                ms2_p = istatistikler["MS 2"] / toplam_eslesme
                 st.progress(ms1_p); st.text(f"MS 1 (Ev): %{ms1_p*100:.1f}")
                 st.progress(ms0_p); st.text(f"MS 0 (Beraberlik): %{ms0_p*100:.1f}")
                 st.progress(ms2_p); st.text(f"MS 2 (Dep): %{ms2_p*100:.1f}")
@@ -332,16 +328,14 @@ else:
                 st.progress(kgyok_p); st.text(f"KG YOK: %{kgyok_p*100:.1f}")
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # Benzer Maçlar Arşivi
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown("### 🗂️ Benzer Açılış Oranına Sahip Geçmiş Maçlar")
             df_benzer = pd.DataFrame(eslesen_maclar_listesi)
             st.dataframe(df_benzer, use_container_width=True, hide_index=True)
             
         else:
-            st.warning("⚠️ Bu oran aralığında eşleşen maç bulunamadı. Toleransı biraz daha esnetebiliriz.")
+            st.warning("⚠️ Bu oran aralığında eşleşen maç bulunamadı.")
 
-        # TÜM ARŞİV EXCEL/CSV İNDİRME BÖLÜMÜ
         if tum_arsiv_listesi:
             st.markdown("<br><hr>", unsafe_allow_html=True)
             st.markdown("### 📊 Geçmiş 5 Sezonun Tam Maç ve Oran Arşivi (Excel Raporu)")
