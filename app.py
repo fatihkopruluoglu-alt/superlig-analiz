@@ -123,11 +123,18 @@ def sezonlari_cek():
     url = f"{BASE_URL}/football/competitions/{competition_id}/seasons"
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
-        # Tüm 5 sezonu alıyoruz (Artık [:5] ile sınırlandırmayı kaldırdık, gelenlerin hepsini alıyoruz)
-        return resp.json().get('data', [])
-    return [{"id": "sn_1361088", "name": "2026/2027 (Güncel)"}]
+        seasons_data = resp.json().get('data', [])
+        return seasons_data
+    return []
 
 seasons = sezonlari_cek()
+
+# Sezonların gerçekten doğru gelip gelmediğini görmek için küçük bir debug bilgisi ekleyelim
+if seasons:
+    with st.expander("🛠️ Sistem Sezon Bilgileri (Kontrol Paneli)"):
+        for s in seasons:
+            st.write(f"Sezon ID: {s.get('id')} | Sezon Adı: {s.get('name')}")
+
 current_season_id = seasons[0].get('id') if seasons else "sn_1361088"
 matches_url = f"{BASE_URL}/football/matches"
 params = {"competition_id": competition_id, "season_id": current_season_id, "per_page": 20}
@@ -208,7 +215,7 @@ else:
     st.markdown("<br>", unsafe_allow_html=True)
     
     if st.button("🚀 5 YILLIK ARŞİV İLE BENZER MAÇLARI VE SKORLARI GETİR"):
-        with st.spinner("🔍 Tüm geçmiş 5 sezon (2022-2027) taranıyor, oranlar eşleştiriliyor..."):
+        with st.spinner("🔍 Tüm geçmiş sezonlar taranıyor, oranlar eşleştiriliyor..."):
             tolerance = 0.65
             toplam_eslesme = 0
             istatistikler = {"MS 1": 0, "MS 0": 0, "MS 2": 0, "2.5 ÜST": 0, "2.5 ALT": 0, "KG VAR": 0, "KG YOK": 0}
@@ -218,6 +225,7 @@ else:
             
             for sez in seasons:
                 s_id = sez.get('id')
+                sezon_adi = sez.get('name', 'Bilinmiyor')
                 page = 1
                 while True:
                     s_params = {"competition_id": competition_id, "season_id": s_id, "per_page": 100, "page": page}
@@ -247,7 +255,6 @@ else:
                                             a_team = mac.get('away_team', {}).get('name')
                                             hs = mac.get('score', {}).get('home')
                                             as_ = mac.get('score', {}).get('away')
-                                            sezon_adi = sez.get('name', 'Bilinmiyor')
                                             
                                             if hs is not None and as_ is not None:
                                                 toplam_gol = hs + as_
@@ -259,9 +266,9 @@ else:
                                                     "Sezon": sezon_adi,
                                                     "Ev Sahibi": h_team,
                                                     "Deplasman": a_team,
-                                                    "Açılış MS 1": gh if gh else "-",
-                                                    "Açılış MS 0": gd if gd else "-",
-                                                    "Açılış MS 2": ga if ga else "-",
+                                                    "Açılış MS 1": str(gh) if gh else "-",
+                                                    "Açılış MS 0": str(gd) if gd else "-",
+                                                    "Açılış MS 2": str(ga) if ga else "-",
                                                     "Skor": f"{hs} - {as_}",
                                                     "Maç Sonucu": mac_sonucu,
                                                     "Gol Alt/Üst": ust_alt,
@@ -287,7 +294,7 @@ else:
                                                         else: istatistikler["MS 2"] += 1
                                                         
                                                         if toplam_gol > 2.5: istatistikler["2.5 ÜST"] += 1
-                                                        else: istatistikler["2.5 ALT"] += 1
+                                                        else: istatistler["2.5 ALT"] += 1
                                                         
                                                         if hs > 0 and as_ > 0: istatistikler["KG VAR"] += 1
                                                         else: istatistikler["KG YOK"] += 1
@@ -296,7 +303,7 @@ else:
                         break
                     page += 1
 
-        st.success(f"✅ Analiz Tamamlandı! Tüm 5 sezonda eşleşen benzer maç sayısı: {toplam_eslesme}")
+        st.success(f"✅ Analiz Tamamlandı! Tüm sezonlarda eşleşen benzer maç sayısı: {toplam_eslesme}")
         
         if toplam_eslesme > 0:
             st.markdown("### 📈 Olasılık Dağılım Raporu")
@@ -306,7 +313,7 @@ else:
                 st.markdown('<div class="card-container">', unsafe_allow_html=True)
                 st.subheader("Maç Sonucu")
                 ms1_p = istatistikler["MS 1"] / toplam_eslesme
-                ms0_p = istatistikler["MS 0"] / toplam_eslesme
+                ms0_p = ististiker_ms0 = istatistikler["MS 0"] / toplam_eslesme
                 ms2_p = istatistikler["MS 2"] / toplam_eslesme
                 st.progress(ms1_p); st.text(f"MS 1 (Ev): %{ms1_p*100:.1f}")
                 st.progress(ms0_p); st.text(f"MS 0 (Beraberlik): %{ms0_p*100:.1f}")
@@ -339,15 +346,16 @@ else:
 
         if tum_arsiv_listesi:
             st.markdown("<br><hr>", unsafe_allow_html=True)
-            st.markdown("### 📊 Geçmiş 5 Sezonun Tam Maç ve Oran Arşivi (Excel Raporu)")
-            st.markdown(f"Toplam **{len(tum_arsiv_listesi)} adet** geçmiş maç taranmıştır. Tüm sezonların verilerini Excel formatında indirebilirsin:")
+            st.markdown("### 📊 Geçmiş Sezonların Tam Maç ve Oran Arşivi (Excel Raporu)")
+            st.markdown(f"Toplam **{len(tum_arsiv_listesi)} adet** geçmiş maç taranmıştır. Hücrelerin düzgün görünmesi için **noktalı virgül (;)** ayracıyla Excel formatına uygun hazırlandı:")
             
             df_tum = pd.DataFrame(tum_arsiv_listesi)
-            csv_verisi = df_tum.to_csv(index=False).encode('utf-8')
+            # Excel'in sütunları düzgün ayırması için sep=';' ve utf-8-sig (Türkçe karakter bozulmasın diye) kullanıyoruz
+            csv_verisi = df_tum.to_csv(index=False, sep=';').encode('utf-8-sig')
             
             st.download_button(
-                label="📥 Tüm 5 Yıllık Arşivi Excel (CSV) Olarak İndir",
+                label="📥 Tüm Arşivi Düzgün Excel (CSV) Olarak İndir",
                 data=csv_verisi,
-                file_name="superlig_5_yil_oran_ve_skor_arsivi.csv",
+                file_name="superlig_tum_sezonlar_arsiv.csv",
                 mime="text/csv",
             )
