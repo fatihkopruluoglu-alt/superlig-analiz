@@ -123,11 +123,12 @@ def sezonlari_cek():
     url = f"{BASE_URL}/football/competitions/{competition_id}/seasons"
     resp = requests.get(url, headers=headers)
     if resp.status_code == 200:
-        return resp.json().get('data', [])[:5]
+        # Tüm 5 sezonu alıyoruz (Artık [:5] ile sınırlandırmayı kaldırdık, gelenlerin hepsini alıyoruz)
+        return resp.json().get('data', [])
     return [{"id": "sn_1361088", "name": "2026/2027 (Güncel)"}]
 
 seasons = sezonlari_cek()
-current_season_id = seasons[0].get('id')
+current_season_id = seasons[0].get('id') if seasons else "sn_1361088"
 matches_url = f"{BASE_URL}/football/matches"
 params = {"competition_id": competition_id, "season_id": current_season_id, "per_page": 20}
 
@@ -207,7 +208,7 @@ else:
     st.markdown("<br>", unsafe_allow_html=True)
     
     if st.button("🚀 5 YILLIK ARŞİV İLE BENZER MAÇLARI VE SKORLARI GETİR"):
-        with st.spinner("🔍 Geçmiş sezonlar taranıyor, genişletilmiş oran toleransı (±0.65) eşleştiriliyor..."):
+        with st.spinner("🔍 Tüm geçmiş 5 sezon (2022-2027) taranıyor, oranlar eşleştiriliyor..."):
             tolerance = 0.65
             toplam_eslesme = 0
             istatistikler = {"MS 1": 0, "MS 0": 0, "MS 2": 0, "2.5 ÜST": 0, "2.5 ALT": 0, "KG VAR": 0, "KG YOK": 0}
@@ -295,7 +296,7 @@ else:
                         break
                     page += 1
 
-        st.success(f"✅ Analiz Tamamlandı! Genişletilmiş arama ile eşleşen benzer maç sayısı: {toplam_eslesme}")
+        st.success(f"✅ Analiz Tamamlandı! Tüm 5 sezonda eşleşen benzer maç sayısı: {toplam_eslesme}")
         
         if toplam_eslesme > 0:
             st.markdown("### 📈 Olasılık Dağılım Raporu")
@@ -339,7 +340,7 @@ else:
         if tum_arsiv_listesi:
             st.markdown("<br><hr>", unsafe_allow_html=True)
             st.markdown("### 📊 Geçmiş 5 Sezonun Tam Maç ve Oran Arşivi (Excel Raporu)")
-            st.markdown("Sistemdeki taranan tüm geçmiş maçların açılış oranlarını, skorlarını, Alt/Üst ve KG durumlarını içeren tam listeyi Excel formatına uygun olarak indirebilirsin:")
+            st.markdown(f"Toplam **{len(tum_arsiv_listesi)} adet** geçmiş maç taranmıştır. Tüm sezonların verilerini Excel formatında indirebilirsin:")
             
             df_tum = pd.DataFrame(tum_arsiv_listesi)
             csv_verisi = df_tum.to_csv(index=False).encode('utf-8')
