@@ -1,6 +1,6 @@
-
 import streamlit as st
 import requests
+import pandas as pd
 from datetime import datetime
 
 # Sayfa Yapılandırması
@@ -10,7 +10,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Özel CSS Tasarımı (Minimalist Saat ve Şık Kartlar)
+# Özel CSS Tasarımı
 st.markdown("""
     <style>
     .stApp {
@@ -105,7 +105,7 @@ competition_id = "comp_9235"
 
 simdi = datetime.now().strftime("%d.%m.%Y - %H:%M")
 
-# Üst Bilgi Barı ve Göze Batmayan Saat
+# Üst Bilgi Barı ve Saat
 st.markdown(f"""
     <div class="top-bar">
         <div class="top-title">
@@ -207,11 +207,12 @@ else:
     st.markdown("<br>", unsafe_allow_html=True)
     
     if st.button("🚀 5 YILLIK ARŞİV İLE BENZER MAÇLARI VE SKORLARI GETİR"):
-        with st.spinner("🔍 Geçmiş sezonlar taranıyor, oran toleransı (±0.45) eşleştiriliyor..."):
-            tolerance = 0.45
+        with st.spinner("🔍 Geçmiş sezonlar taranıyor, genişletilmiş oran toleransı (±0.65) eşleştiriliyor..."):
+            tolerance = 0.65  # Havuzu genişletmek için toleransı biraz esnettik
             toplam_eslesme = 0
             istatistikler = {"MS 1": 0, "MS 0": 0, "MS 2": 0, "2.5 ÜST": 0, "2.5 ALT": 0, "KG VAR": 0, "KG YOK": 0}
             eslesen_maclar_listesi = []
+            tum_arsiv_listesi = []
             target = secilen_mac['odds']
             
             for sez in seasons:
@@ -236,33 +237,59 @@ else:
                                 for b in bms:
                                     if b.get('bookmaker') in ['Pinnacle', 'Bet365']:
                                         m_odds = b.get('markets', {}).get('match_odds', {})
+                                        totals_m = b.get('markets', {}).get('total_goals', {}).get('2.5', {})
+                                        btts_m = b.get('markets', {}).get('btts', {})
                                         if m_odds:
                                             gh = m_odds.get('home', {}).get('opening')
                                             gd = m_odds.get('draw', {}).get('opening')
                                             ga = m_odds.get('away', {}).get('opening')
-                                            if gh and gd and ga:
-                                                gh, gd, ga = float(gh), float(gd), float(ga)
-                                                if abs(gh - target['home']) <= tolerance and abs(gd - target['draw']) <= tolerance:
-                                                    toplam_eslesme += 1
-                                                    h_team = mac.get('home_team', {}).get('name')
-                                                    a_team = mac.get('away_team', {}).get('name')
-                                                    hs = mac.get('score', {}).get('home')
-                                                    as_ = mac.get('score', {}).get('away')
-                                                    sezon_adi = sez.get('name', 'Bilinmiyor')
-                                                    
-                                                    if hs is not None and as_ is not None:
+                                            
+                                            h_team = mac.get('home_team', {}).get('name')
+                                            a_team = mac.get('away_team', {}).get('name')
+                                            hs = mac.get('score', {}).get('home')
+                                            as_ = mac.get('score', {}).get('away')
+                                            sezon_adi = sez.get('name', 'Bilinmiyor')
+                                            
+                                            if hs is not None and as_ is not None:
+                                                # Tüm arşiv listesi için veriyi hazırlayalım
+                                                toplam_gol = hs + as_
+                                                ust_alt = "2.5 ÜST" if toplam_gol > 2.5 else "2.5 ALT"
+                                                kg_durum = "KG VAR" if (hs > 0 and as_ > 0) else "KG YOK"
+                                                 mac_sonucu = "MS 1" if hs > as_ else ("MS 0" if hs == as_ else "MS 2")
+                                                
+                                                tum_arsiv_listesi.append({
+                                                    "Sezon": sezon_adi,
+                                                    "Ev Sahibi": h_team,
+                                                    "Deplasman": a_team,
+                                                    "Açılış MS 1": gh if gh else "-",
+                                                    "Açılış MS 0": gd if gd else "-",
+                                                    "Açılış MS 2": ga if ga else "-",
+                                                    "Skor": f"{hs} - {as_}",
+                                                    "Maç Sonucu": mac_sonucu,
+                                                    "Gol Alt/Üst": ust_alt,
+                                                    "Karşılıklı Gol": kg_durum
+                                                })
+
+                                                # Seçilen maçla benzer oran arayan simülasyon kısmı
+                                                if gh and gd and ga:
+                                                    gh_f, gd_f, ga_f = float(gh), float(gd), float(ga)
+                                                    if abs(gh_f - target['home']) <= tolerance and abs(gd_f - target['draw']) <= tolerance:
+                                                        toplam_eslesme += 1
                                                         eslesen_maclar_listesi.append({
-                                                            "sezon": sezon_adi,
-                                                            "ev": h_team,
-                                                            "dep": a_team,
-                                                            "skor": f"{hs} - {as_}"
+                                                            "Sezon": sezon_adi,
+                                                            "Ev Sahibi": h_team,
+                                                            "Deplasman": a_team,
+                                                            "Açılış MS1": gh_f,
+                                                            "Açılış MS0": gd_f,
+                                                            "Açılış MS2": ga_f,
+                                                            "Maç Skoru": f"{hs} - {as_}"
                                                         })
                                                         
                                                         if hs > as_: istatistikler["MS 1"] += 1
                                                         elif hs == as_: istatistikler["MS 0"] += 1
                                                         else: istatistikler["MS 2"] += 1
                                                         
-                                                        if hs + as_ > 2.5: istatistikler["2.5 ÜST"] += 1
+                                                        if toplam_gol > 2.5: istatistikler["2.5 ÜST"] += 1
                                                         else: istatistikler["2.5 ALT"] += 1
                                                         
                                                         if hs > 0 and as_ > 0: istatistikler["KG VAR"] += 1
@@ -272,7 +299,7 @@ else:
                         break
                     page += 1
 
-        st.success(f"✅ Analiz Tamamlandı! Arşivde Benzer Orana Sahip Eşleşen Maç Sayısı: {toplam_eslesme}")
+        st.success(f"✅ Analiz Tamamlandı! Genişletilmiş arama ile eşleşen benzer maç sayısı: {toplam_eslesme}")
         
         if toplam_eslesme > 0:
             st.markdown("### 📈 Olasılık Dağılım Raporu")
@@ -283,7 +310,7 @@ else:
                 st.subheader("Maç Sonucu")
                 ms1_p = istatistikler["MS 1"] / toplam_eslesme
                 ms0_p = istatistikler["MS 0"] / toplam_eslesme
-                ms2_p = istatistikler["MS 2"] / toplam_eslesme
+                ms2_p = istatistler["MS 2"] / toplam_eslesme
                 st.progress(ms1_p); st.text(f"MS 1 (Ev): %{ms1_p*100:.1f}")
                 st.progress(ms0_p); st.text(f"MS 0 (Beraberlik): %{ms0_p*100:.1f}")
                 st.progress(ms2_p); st.text(f"MS 2 (Dep): %{ms2_p*100:.1f}")
@@ -305,16 +332,27 @@ else:
                 st.progress(kgyok_p); st.text(f"KG YOK: %{kgyok_p*100:.1f}")
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # YENİ EKLENEN ÖZELLİK: Geçmiş Eşleşen Maçlar ve Skorlar Listesi
+            # Benzer Maçlar Arşivi
             st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown("### 🗂️ Geçmişte Bu Oranlarla Oynanmış Benzer Maçlar ve Skor Arşivi")
-            st.markdown("Geçmiş 5 sezonda benzer açılış oranlarına sahip bitmiş maçların listesi:")
-            
-            # Tablo görünümü için veriyi hazırlayalım
-            import pandas as pd
-            df_arsiv = pd.format_data = pd.DataFrame(eslesen_maclar_listesi)
-            df_arsiv.columns = ["Sezon", "Ev Sahibi", "Deplasman", "Maç Skoru"]
-            st.dataframe(df_arsiv, use_container_width=True, hide_index=True)
+            st.markdown("### 🗂️ Benzer Açılış Oranına Sahip Geçmiş Maçlar")
+            df_benzer = pd.DataFrame(eslesen_maclar_listesi)
+            st.dataframe(df_benzer, use_container_width=True, hide_index=True)
             
         else:
-            st.warning("⚠️ Bu oran aralığında geçmiş 5 sezonda eşleşen yeterli maç bulunamadı.")
+            st.warning("⚠️ Bu oran aralığında eşleşen maç bulunamadı. Toleransı biraz daha esnetebiliriz.")
+
+        # TÜM ARŞİV EXCEL/CSV İNDİRME BÖLÜMÜ
+        if tum_arsiv_listesi:
+            st.markdown("<br><hr>", unsafe_allow_html=True)
+            st.markdown("### 📊 Geçmiş 5 Sezonun Tam Maç ve Oran Arşivi (Excel Raporu)")
+            st.markdown("Sistemdeki taranan tüm geçmiş maçların açılış oranlarını, skorlarını, Alt/Üst ve KG durumlarını içeren tam listeyi Excel formatına uygun olarak indirebilirsin:")
+            
+            df_tum = pd.DataFrame(tum_arsiv_listesi)
+            csv_verisi = df_tum.to_csv(index=False).encode('utf-8')
+            
+            st.download_button(
+                label="📥 Tüm 5 Yıllık Arşivi Excel (CSV) Olarak İndir",
+                data=csv_verisi,
+                file_name="superlig_5_yil_oran_ve_skor_arsivi.csv",
+                mime="text/csv",
+            )
